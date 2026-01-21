@@ -1,4 +1,40 @@
 // 后台服务工作脚本
+
+// 安装时创建右键菜单
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({
+    id: "showTabKeeper",
+    title: "显示 TabKeeper 主页",
+    contexts: ["action"],
+  });
+});
+
+// 右键菜单点击事件
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === "showTabKeeper") {
+    openTabKeeperPage();
+  }
+});
+
+// 打开 TabKeeper 主页
+async function openTabKeeperPage() {
+  // 查找是否已经有 TabKeeper 标签页
+  const tabs = await chrome.tabs.query({});
+  const tabKeeperTab = tabs.find(
+    (t) => t.url && t.url.includes("tabkeeper.html"),
+  );
+
+  if (tabKeeperTab) {
+    // 如果已存在，激活该标签页
+    await chrome.tabs.update(tabKeeperTab.id, { active: true });
+    await chrome.windows.update(tabKeeperTab.windowId, { focused: true });
+  } else {
+    // 如果不存在，创建新标签页
+    await chrome.tabs.create({ url: "tabkeeper.html" });
+  }
+}
+
+// 点击扩展图标 - 保存当前窗口的所有标签页
 chrome.action.onClicked.addListener(async (tab) => {
   try {
     // 获取当前窗口的所有标签页
@@ -46,13 +82,21 @@ chrome.action.onClicked.addListener(async (tab) => {
 
     // 检查是否还有 TabKeeper 标签页
     const remainingTabs = await chrome.tabs.query({ windowId: window.id });
-    const hasTabKeeperTab = remainingTabs.some((t) =>
-      t.url.includes("tabkeeper.html"),
+    const hasTabKeeperTab = remainingTabs.some(
+      (t) => t.url && t.url.includes("tabkeeper.html"),
     );
 
     if (!hasTabKeeperTab) {
       // 如果没有 TabKeeper 标签页，打开一个
-      await chrome.tabs.create({ url: "tabkeeper.html" });
+      await openTabKeeperPage();
+    } else {
+      // 如果有 TabKeeper 标签页，激活它
+      const tabKeeperTab = remainingTabs.find(
+        (t) => t.url && t.url.includes("tabkeeper.html"),
+      );
+      if (tabKeeperTab) {
+        await chrome.tabs.update(tabKeeperTab.id, { active: true });
+      }
     }
   } catch (error) {
     console.error("保存标签页失败:", error);
